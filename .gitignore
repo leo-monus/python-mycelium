@@ -1,0 +1,18 @@
+__pycache__
+myconfig.py
+# OS generated files #
+######################
+.DS_Store?
+ehthumbs.db
+._*
+# Icon?
+Thumbs.db
+.idea
+.DS_Store
+
+# Test reports and coverages
+.coverage
+coverage.xml
+junit.xml
+htmlcov
+venv

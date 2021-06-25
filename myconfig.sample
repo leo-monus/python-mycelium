@@ -1,0 +1,14 @@
+# database of the registry
+db_host='localhost'
+# the user name that the harvester connects
+db_user='webuser'
+db_passwd=''
+# the database name
+db='dbs_registry'
+# the database port
+db_port=3306
+
+neo4j_url='localhost'
+neo4j_user='neo4j'
+neo4j_password=''
+neo4j_port=7687

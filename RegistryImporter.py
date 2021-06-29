@@ -20,16 +20,16 @@ class RegistryImporter:
 
     def import_datasource(self, datasource_id):
         #self.import_registry_objects(datasource_id)
-        #self.import_registry_object_relationships(datasource_id)
-        #self.import_identifiers(datasource_id)
+        self.import_registry_object_relationships(datasource_id)
+        self.import_identifiers(datasource_id)
         self.import_identifier_relationships(datasource_id)
 
 
     def import_single(self, ro_id):
-        #self.import_registry_objects(ro_id)
+        #self.import_single_registry_objects(ro_id)
         self.import_single_registry_object_relationships(ro_id)
-        #self.import_identifiers(ro_id)
-        #self.import_identifier_relationships(ro_id)
+        #self.import_single_registry_object_identifiers(ro_id)
+        #self.import_single_registry_objec_identifier_relationships(ro_id)
 
 
     def import_single_registry_object_relationships(self, ro_id):
@@ -202,6 +202,6 @@ class RegistryImporter:
 
 
     def import_registry_object_relationship(self, row):
+        print(row[0], row[1], row[2], row[4])
         self.driver.create_registry_object_relationship(row)
 
-        #print(row[0], row[1], row[2], row[4])

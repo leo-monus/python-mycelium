@@ -114,6 +114,10 @@ class GraphLoader:
             raise
 
     def create_registry_object_relationship(self, row):
+        if row[1] is None or row[1].strip() == '':
+            return
+        if row[4] is None or row[4].strip() == '':
+            return
         with self.driver.session() as session:
             # Write transactions allow the driver to handle retries and transient errors
             result = session.write_transaction(

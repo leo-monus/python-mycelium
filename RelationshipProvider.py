@@ -34,10 +34,36 @@ class RelationshipProvider:
                 # print("####################")
 
 
+    def getFunder(self, identifier_value, identifier_type):
+        with self.driver.session() as session:
+            # Write transactions allow the driver to handle retries and transient errors
+            result = session.read_transaction(self._get_funder, identifier_value, identifier_type)
+            for record in result:
+                print(record)
+                # print(record['subject'])
+                # print("...............")
+                # print(record['object'])
+                # print("...............")
+                # print(record['predicate'])
+                # print("####################")
+
+    def getRelationshipsBetween(self, from_identifier_value, from_identifier_type, to_identifier_value, to_identifier_type):
+        with self.driver.session() as session:
+            # Write transactions allow the driver to handle retries and transient errors
+            result = session.read_transaction(self._get_relationships_between, from_identifier_value, from_identifier_type, to_identifier_value, to_identifier_type)
+            for record in result:
+                print(record)
+                # print(record['subject'])
+                # print("...............")
+                # print(record['object'])
+                # print("...............")
+                # print(record['predicate'])
+                # print("####################")
+
     @staticmethod
     def _get_funded_collections(tx, identifier_value, identifier_type):
         print(identifier_value + "  " + identifier_type)
-        path_def = "sameAs|isFunderOf|isFundedBy|isPartOf|hasPart|isProducedBy|isOutptOf|isOwnedBy"
+        path_def = "sameAs|isFunderOf>|<isFundedBy|isPartOf>|<hasPart|<isOutputOf|hasOutput>|<isProducedBy"
         query = (
             "MATCH(p:Identifier {identifier_value: $identifier_value, identifier_type: $identifier_type}) "
             "CALL apoc.path.expandConfig(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 10}) "
@@ -61,7 +87,88 @@ class RelationshipProvider:
                 query=query, exception=exception))
             raise
 
+    @staticmethod
+    def _get_funder(tx, identifier_value, identifier_type):
+        print(identifier_value + "  " + identifier_type)
+        path_def = "sameAs|<isFunderOf|isFundedBy>|<isPartOf|hasPart>|isOutputOf>|<hasOutput|isProducedBy>"
+        query = (
+            "MATCH(p:Identifier {identifier_value: $identifier_value, identifier_type: $identifier_type}) "
+            "CALL apoc.path.expandConfig(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 10}) "
+            "YIELD path "
+            "WITH apoc.path.elements(path) as pathElements "
+            "WITH [idx in range(0, size(pathElements) - 1) | "
+            "CASE WHEN idx % 2 = 0 AND pathElements[idx].identifier_value <> '' "
+            "THEN pathElements[idx].identifier_value "  # Identifier
+            "WHEN idx % 2 = 0 AND pathElements[idx].ro_id <> '' THEN pathElements[idx].ro_id "  # RegistryObject
+            "ELSE type(pathElements[idx]) END] as pathElements "  # relationship
+            "WITH [idx in range(0, size(pathElements) - 2, 2) | pathElements[idx..idx+3]] as triplets "
+            "RETURN triplets"
+        )
+        result = tx.run(query, identifier_value=identifier_value, identifier_type=identifier_type, path_def=path_def)
+        try:
+            return [record for record in result]
+
+        # Capture any errors along with the query and data for traceability
+        except ServiceUnavailable as exception:
+            logging.error("{query} raised an error: \n {exception}".format(
+                query=query, exception=exception))
+            raise
+
+    @staticmethod
+    def _get_relationships_between(tx, from_identifier_value, from_identifier_type, to_identifier_value, to_identifier_type):
+        print(from_identifier_value + "  " + from_identifier_type)
+        print(to_identifier_value + "  " + to_identifier_type)
+        query = (
+            "MATCH (from:Identifier {identifier_value:$from_identifier_value, identifier_type:$from_identifier_type}), "
+            "(to:Identifier {identifier_value:$to_identifier_value, identifier_type:$to_identifier_type}) "
+            "CALL apoc.algo.dijkstra(from, to, '', 'distance') YIELD path AS path, weight AS weight "
+            "WITH apoc.path.elements(path) as pathElements "
+            "WITH [idx in range(0, size(pathElements) - 1) | "
+            "CASE WHEN idx % 2 = 0 AND pathElements[idx].identifier_value <> '' "
+            "THEN pathElements[idx].identifier_value "  # Identifier
+            "WHEN idx % 2 = 0 AND pathElements[idx].ro_id <> '' THEN pathElements[idx].ro_id " # RegistryObject
+            "ELSE type(pathElements[idx]) END] as pathElements "  # relationship
+            "WITH [idx in range(0, size(pathElements) - 2, 2) | pathElements[idx..idx+3]] as triplets "
+            "RETURN triplets"
+        )
+        result = tx.run(query,  from_identifier_value=from_identifier_value, from_identifier_type=from_identifier_type,
+                        to_identifier_value=to_identifier_value, to_identifier_type=to_identifier_type)
+        try:
+            return [record for record in result]
+
+        # Capture any errors along with the query and data for traceability
+        except ServiceUnavailable as exception:
+            logging.error("{query} raised an error: \n {exception}".format(
+                query=query, exception=exception))
+            raise
 
 
+    @staticmethod
+    def _get_shortest_path(tx, from_identifier_value, from_identifier_type, to_identifier_value, to_identifier_type):
+        print(from_identifier_value + "  " + from_identifier_type)
+        print(to_identifier_value + "  " + to_identifier_type)
+        query = (
+            "MATCH (from:Identifier {identifier_value:$from_identifier_value, identifier_type:$from_identifier_type}), "
+            "(to:Identifier {identifier_value:$to_identifier_value, identifier_type:$to_identifier_type}) "
+            "CALL apoc.algo.dijkstra(from, to, '', 'distance') YIELD path AS path, weight AS weight "
+            "WITH apoc.path.elements(path) as pathElements "
+            "WITH [idx in range(0, size(pathElements) - 1) | "
+            "CASE WHEN idx % 2 = 0 AND pathElements[idx].identifier_value <> '' "
+            "THEN pathElements[idx].identifier_value "  # Identifier
+            "WHEN idx % 2 = 0 AND pathElements[idx].ro_id <> '' THEN pathElements[idx].ro_id " # RegistryObject
+            "ELSE type(pathElements[idx]) END] as pathElements "  # relationship
+            "WITH [idx in range(0, size(pathElements) - 2, 2) | pathElements[idx..idx+3]] as triplets "
+            "RETURN triplets"
+        )
+        result = tx.run(query,  from_identifier_value=from_identifier_value, from_identifier_type=from_identifier_type,
+                        to_identifier_value=to_identifier_value, to_identifier_type=to_identifier_type)
+        try:
+            return [record for record in result]
+
+        # Capture any errors along with the query and data for traceability
+        except ServiceUnavailable as exception:
+            logging.error("{query} raised an error: \n {exception}".format(
+                query=query, exception=exception))
+            raise
 
 

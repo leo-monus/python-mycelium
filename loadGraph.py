@@ -22,7 +22,8 @@ if __name__ == "__main__":
     # 149 is Victoria University
     # 162 Department of Sustainability, Environment, Population and Community
     # 161 ANDS - National Collections Data Source
-    datasource_id = 161
+    # 25 Federation University Australia
+    datasource_id = 25
     app.load_datasource(datasource_id)
     #ro_id = 68038
     #app.import_single(ro_id)

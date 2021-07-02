@@ -19,24 +19,23 @@ class RegistryImporter:
 
 
     def import_datasource(self, datasource_id):
-        #self.import_registry_objects(datasource_id)
+        self.import_registry_objects(datasource_id)
         self.import_registry_object_relationships(datasource_id)
         self.import_identifiers(datasource_id)
         self.import_identifier_relationships(datasource_id)
 
 
     def import_single(self, ro_id):
-        #self.import_single_registry_objects(ro_id)
+
         self.import_single_registry_object_relationships(ro_id)
-        #self.import_single_registry_object_identifiers(ro_id)
-        #self.import_single_registry_objec_identifier_relationships(ro_id)
+
 
 
     def import_single_registry_object_relationships(self, ro_id):
         tablename = "dbs_registry.registry_object_relationships"
         where = "WHERE registry_object_id = %s" % ro_id
         query = "SELECT * from %s %s" % (tablename, where)
-        print(query)
+        #print(query)
         try:
             conn = self.database.getConnection()
             cur = conn.cursor()
@@ -61,7 +60,7 @@ class RegistryImporter:
         page = 0
         while (page * self.batch_size) < size:
             query = "SELECT * from %s %s order by 1 limit %d offset %d" % (tablename, where, self.batch_size, (page * self.batch_size))
-            print(query)
+            #print(query)
             try:
                 print(page)
                 conn = self.database.getConnection()
@@ -89,7 +88,7 @@ class RegistryImporter:
         page = 0
         while (page * self.batch_size) < size:
             query = "SELECT * from %s %s order by 1 limit %d offset %d" % (tablename, where, self.batch_size, (page * self.batch_size))
-            print(query)
+            #print(query)
             try:
                 print(page)
                 conn = self.database.getConnection()
@@ -109,16 +108,18 @@ class RegistryImporter:
 
 
     def import_identifiers(self, datasource_id):
-        tablename = "dbs_registry.registry_object_identifiers"
+        tablename = "dbs_registry.registry_object_identifiers roi, " \
+                    "dbs_registry.registry_objects ro where ro.registry_object_id = roi.registry_object_id "
         where = ""
         if datasource_id != "":
-            where = "WHERE registry_object_id in (SELECT registry_object_id FROM dbs_registry.registry_objects where data_source_id = %d)" % datasource_id
+            where = "AND ro.data_source_id = %d " % datasource_id
         size = self.getsizeof(tablename + " " + where)
 
         page = 0
         while (page * self.batch_size) < size:
-            query = "SELECT * from %s %s order by 2 limit %d offset %d" % (tablename, where, self.batch_size, (page * self.batch_size))
-            print(query)
+            query = "SELECT roi.id, roi.registry_object_id, roi.identifier, roi.identifier_type, ro.class from %s %s " \
+                    "order by 2 limit %d offset %d" % (tablename, where, self.batch_size, (page * self.batch_size))
+            #print(query)
             try:
                 print(page)
                 conn = self.database.getConnection()
@@ -147,7 +148,7 @@ class RegistryImporter:
         page = 0
         while (page * self.batch_size) < size:
             query = "SELECT * from %s %s order by 2 limit %d offset %d" % (tablename, where, self.batch_size, (page * self.batch_size))
-            print(query)
+            #print(query)
             try:
                 print(page)
                 conn = self.database.getConnection()
@@ -189,19 +190,22 @@ class RegistryImporter:
 
 
     def import_identifier_relationship(self, row):
-        self.driver.create_identifier_relationship(row)
         #print(row[1],row[2],row[4],row[3],row[5])
+        self.driver.create_identifier_relationship(row)
+
 
     def import_identifier(self, row):
-        self.driver.create_identifier(row)
         #print(row[1], row[2], row[3])
+        self.driver.create_identifier(row)
+
 
     def import_registry_object(self, row):
-        self.driver.create_registry_object(row)
         #print(row[0], row[5], row[2], row[3])
+        self.driver.create_registry_object(row)
+
 
 
     def import_registry_object_relationship(self, row):
-        print(row[0], row[1], row[2], row[4])
+        #print(row[0], row[1], row[2], row[4])
         self.driver.create_registry_object_relationship(row)
 

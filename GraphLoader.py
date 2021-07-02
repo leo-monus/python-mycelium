@@ -21,15 +21,23 @@ class GraphLoader:
 
 
     def create_registry_object(self, row):
+        # name=row[0],
+        # title=row[5],
+        # ro_id=row[0],
+        # key=row[2],
+        # status=row[6],
+        # ro_class=row[3],
+        # slug=row[4]
         with self.driver.session() as session:
             # Write transactions allow the driver to handle retries and transient errors
+
             result = session.write_transaction(
                 self._create_registry_object, row)
             for record in result:
                 print("Created RegistryObject Vertex: {p}".format(
                     p=record['p']))
             result = session.write_transaction(
-                self._create_identifier, "ro_key", row[2])
+                self._create_identifier, identifier_type="ro_key", identifier_value=row[2], ro_class=row[3])
             for record in result:
                 print("Created Identifier for roKey Vertex: {n}".format(
                     n=record['n']))
@@ -44,12 +52,14 @@ class GraphLoader:
     @staticmethod
     def _create_registry_object(tx, row):
         query = (
-            "MERGE (p:RegistryObject {name:$name, title:$title, ro_id:$ro_id, key:$key, status:$status, ro_class:$ro_class, slug:$slug}) "
+            "MERGE (p:RegistryObject {name:$name, title:$title, ro_id:$ro_id, "
+            "key:$key, status:$status, ro_class:$ro_class, slug:$slug}) "
             "RETURN p"
         )
         #print(row)
         #exit(0)
-        result = tx.run(query, name=row[0], title=row[5], ro_id=row[0], key=row[2], status=row[6], ro_class=row[3], slug=row[4])
+        result = tx.run(query, name=row[0], title=row[5], ro_id=row[0],
+                        key=row[2], status=row[6], ro_class=row[3], slug=row[4])
         try:
             return [{"p": record["p"]["title"]}
                     for record in result]
@@ -62,10 +72,11 @@ class GraphLoader:
 
 
     def create_identifier(self, row):
+        #print(row)
         with self.driver.session() as session:
             # Write transactions allow the driver to handle retries and transient errors
             result = session.write_transaction(
-                self._create_identifier, row[3], row[2])
+                self._create_identifier, row[3], row[2], row[4])
             for record in result:
                 print("Created Identifier Vertex: {n}".format(
                     n=record['n']))
@@ -76,14 +87,26 @@ class GraphLoader:
                     r=record['r']))
 
     @staticmethod
-    def _create_identifier(tx, identifier_type, identifier_value):
-        query = (
-            "MERGE (n:Identifier {identifier_type:$identifier_type, identifier_value:$identifier_value}) "
-            "RETURN n"
-        )
+    def _create_identifier(tx, identifier_type, identifier_value, ro_class):
+
+        if ro_class is None:
+            ro_class = "unknown"
+        if ro_class != "unknown":
+            query = (
+                "MERGE (n:Identifier {identifier_type:$identifier_type, identifier_value:$identifier_value}) "
+                "ON CREATE SET n.ro_class = $ro_class "
+                "RETURN n"
+            )
+        else:
+            query = (
+                "MERGE (n:Identifier {identifier_type:$identifier_type, identifier_value:$identifier_value}) "
+                "ON CREATE SET n.ro_class = $ro_class "
+                "ON MATCH SET n.ro_class = $ro_class "
+                "RETURN n"
+                )
         #print(row)
         #exit(0)
-        result = tx.run(query, identifier_type=identifier_type, identifier_value=identifier_value)
+        result = tx.run(query, identifier_type=identifier_type, identifier_value=identifier_value, ro_class=ro_class)
         try:
             return [record for record in result]
 
@@ -121,11 +144,11 @@ class GraphLoader:
         with self.driver.session() as session:
             # Write transactions allow the driver to handle retries and transient errors
             result = session.write_transaction(
-                self._create_identifier, "ro_key", row[1])
+                self._create_identifier, "ro_key", row[1], "unknown")
             for record in result:
                 print("Created Identifier for roKey Vertex: {n}".format(
                     n=record['n']))
-            print(row[1], row[0], row[2], row[4])
+            #print(row[1], row[0], row[2], row[4])
             result = session.write_transaction(
                 self._create_relationship_to_identifier_vertex, "ro_key", row[1], row[0], row[2], row[4])
             for record in result:
@@ -137,11 +160,12 @@ class GraphLoader:
         with self.driver.session() as session:
             # Write transactions allow the driver to handle retries and transient errors
             result = session.write_transaction(
-                self._create_identifier, row[4], row[2])
+                self._create_identifier, row[4], row[2], row[3])
             for record in result:
                 print("Created Identifier Vertex: {n}".format(
                     n=record['n']))
-            print(row[4], row[2], row[1], row[3], row[5])
+            #print(row[4], row[2], row[1], row[3], row[5])
+            # identifier_type, identifier_value, ro_id, to_class, relation_type
             result = session.write_transaction(
                 self._create_relationship_to_identifier_vertex, row[4], row[2], row[1], row[3], row[5])
             for record in result:

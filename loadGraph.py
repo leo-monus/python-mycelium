@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # 162 Department of Sustainability, Environment, Population and Community
     # 161 ANDS - National Collections Data Source
     # 25 Federation University Australia
-    datasource_id = 25
+    datasource_id = 162
     app.load_datasource(datasource_id)
     #ro_id = 68038
     #app.import_single(ro_id)

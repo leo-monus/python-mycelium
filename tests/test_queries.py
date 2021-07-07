@@ -32,12 +32,13 @@ class test_queries(unittest.TestCase):
 
     def test_get_nested_collections_from_top(self):
         r = RelationshipProvider()
-        r.get_nested_collections("10378.1/1548442", "handle")
+        result = r.get_nested_collections("AODN:440cd6dc-eb6e-46a1-9574-33b58a739db4", "ro_key")
+        print(result)
 
     def test_get_nested_collections_from_bottom(self):
         r = RelationshipProvider()
-        r.get_nested_collections("griffith.edu.au/individual:n361ce8d6cea67950ab9a12edf4c83060", "ro_key")
-
+        result = r.get_nested_collections("http://vivo.curtin.edu.au/vivo/individual/tm66442326", "ro_key")
+        print(result)
 
 
 
@@ -51,7 +52,7 @@ class test_queries(unittest.TestCase):
 
     def test_get_grant_network_2(self):
         r = RelationshipProvider()
-        r.getGrantGraph("https://docs.opengeospatial.org/is/15-078r6/15-078r6.html", "uri")
+        r.getGrantGraph("Activity1", "ro_key")
 
 
 

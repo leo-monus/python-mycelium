@@ -204,15 +204,18 @@ class RelationshipProvider:
                 if len(record["path"].relationships) > last_length:
                     top_node = record["path"].nodes[-1]
                     last_length = len(record["path"].relationships)
+            print("TOP NODE:")
             print(top_node)
+            if top_node is None:
+                return "not part of a nested collection"
             if top_node.get("identifier_value") is not None:
                 result = session.read_transaction(self._get_nested_collections, top_node.get("identifier_value"), top_node.get("identifier_type"))
             elif top_node.get("key") is not None:
-                result = session.read_transaction(self._get_nested_collections, top_node.get("ikey"), "ro_key")
+                result = session.read_transaction(self._get_nested_collections, top_node.get("key"), "ro_key")
             for record in result:
                 response += self.print_record(record)
                 response += "<br/>"
-            return response
+        return response
 
 
 
@@ -221,6 +224,7 @@ class RelationshipProvider:
             # Write transactions allow the driver to handle retries and transient errors
             result = session.read_transaction(self._get_grant_graph, identifier_value, identifier_type)
             for record in result:
+                print(record)
                 self.print_record(record)
 
 

@@ -5,12 +5,16 @@ import logging
 import webservice
 import threading
 import time
+from MyceliumNode import MyceliumNode
+from MyceliumNode import MyceliumNodeList
+
 
 class RelationshipProvider:
 
     reverse_relationships_dict = {}
     relation_hierarchy = {}
-
+    connection_tree = None
+    node_list = None
     def __init__(self):
         print("started")
         scheme = "neo4j"  # Connecting to Aura, use the "neo4j+s" URI scheme
@@ -38,6 +42,8 @@ class RelationshipProvider:
         self.relation_hierarchy["service"] = 2
         self.relation_hierarchy["activity"] = 3
         self.relation_hierarchy["party"] = 4
+        self.connection_tree = None
+        self.node_list = MyceliumNodeList()
 
     def info(self):
         return self.reverse_relationships_dict
@@ -218,6 +224,233 @@ class RelationshipProvider:
         return response
 
 
+    """
+    provide only the top level and shortest path to currnt node
+    and its sibling 
+    """
+    def get_nested_collections_subtree(self, identifier_value, identifier_type):
+        with self.driver.session() as session:
+            response = ""
+            result = session.read_transaction(self._get_top_level_collection, identifier_value, identifier_type)
+            last_length = 0
+            top_node = None
+            for record in result:
+                if len(record["path"].relationships) > last_length:
+                    top_node = record["path"].nodes[-1]
+                    last_length = len(record["path"].relationships)
+
+                #response += self.print_merged_path(record)
+                response += "<br/>"
+            if top_node is None:
+                return "not part of a nested collection"
+            if "Identifier" in top_node.labels:
+                response += "<b>TOP NODE:" + top_node.get("identifier_value") + "</b>"
+                response += "<br/>"
+                result = session.read_transaction(self._get_nested_collections, top_node.get("identifier_value"), top_node.get("identifier_type"))
+            elif"RegistryObject" in top_node.labels:
+                response += "<b>TOP NODE:" + top_node.get("key") + "</b>"
+                response += "<br/>"
+                result = session.read_transaction(self._get_nested_collections, top_node.get("key"), "ro_key")
+            i = 0
+            for record in result:
+                i += 1
+                sPath = self.print_merged_path(record)
+                print(sPath)
+                response += sPath
+                response += "</br>"
+                if i > 30:
+                    return response
+        return response
+
+
+    """
+    provide only the top level and shortest path to currnt node
+    and its sibling 
+    """
+    def get_nested_collections_tree(self, identifier_value, identifier_type):
+        with self.driver.session() as session:
+            response = ""
+            result = session.read_transaction(self._get_top_level_collection, identifier_value, identifier_type)
+            last_length = 0
+            top_node = None
+            for record in result:
+                if len(record["path"].relationships) > last_length:
+                    top_node = record["path"].nodes[-1]
+                    last_length = len(record["path"].relationships)
+
+                #response += self.print_merged_path(record)
+                response += "<br/>"
+            if top_node is None:
+                return "not part of a nested collection"
+            if "Identifier" in top_node.labels:
+                response += "<b>TOP NODE:" + top_node.get("identifier_value") + "</b>"
+                response += "<br/>"
+                result = session.read_transaction(self._get_nested_collections, top_node.get("identifier_value"), top_node.get("identifier_type"))
+            elif"RegistryObject" in top_node.labels:
+                response += "<b>TOP NODE:" + top_node.get("key") + "</b>"
+                response += "<br/>"
+                result = session.read_transaction(self._get_nested_collections, top_node.get("key"), "ro_key")
+            i = 0
+            for record in result:
+                i += 1
+                self.merge_and_build_tree_from_path(record)
+                #if i > 30:
+                #    return self.node_list
+        return self.node_list
+
+
+    def print_merged_path(self, record):
+        relationships = record["path"].relationships
+        nodes = record["path"].nodes
+        sPath = ""
+
+        """
+        Identifier -> record always sameAs
+        Record -> Identifier can be anything
+        we only want RegistryObjects 
+        """
+        current_node = {}
+        next_node = {}
+        #print(record["path"])
+        justSameAs = True
+        for i in (range(len(relationships))):
+            # iterate through all relationships and pick the nodes from left to right
+
+            if relationships[i].type == 'sameAs':
+                # if it's the 'sameAs' then both side added to current_node
+                if "RegistryObject" in nodes[i].labels:
+                    record_id = nodes[i].get("ro_id")
+                    current_node["ro_id"] = record_id
+                if "Identifier" in nodes[i].labels:
+                    identifier_value = nodes[i].get("identifier_value")
+                    identifier_type = nodes[i].get("identifier_type")
+                    current_node[identifier_type] = identifier_value
+
+                if "RegistryObject" in nodes[i + 1].labels:
+                    record_id = nodes[i + 1].get("ro_id")
+                    current_node["ro_id"] = record_id
+                if "Identifier" in nodes[i + 1].labels:
+                    identifier_value = nodes[i + 1].get("identifier_value")
+                    identifier_type = nodes[i + 1].get("identifier_type")
+                    current_node[identifier_type] = identifier_value
+
+            else:
+                # finished with current node here
+                justSameAs = False
+                # left side node[i] is current_node and this time we can add it to the output
+                if "RegistryObject" in nodes[i].labels:
+                    record_id = nodes[i].get("ro_id")
+                    current_node["ro_id"] = record_id
+                if "Identifier" in nodes[i].labels:
+                    identifier_value = nodes[i].get("identifier_value")
+                    identifier_type = nodes[i].get("identifier_type")
+                    current_node[identifier_type] = identifier_value
+                if nodes[i].id == relationships[i].start_node.id:
+                    sPath += "{0}-[{1}]->".format(current_node, relationships[i].type)
+                else:
+                    sPath += "{0}-[{1}]->".format(current_node, self.get_reverse_relationship(relationships[i].type))
+                # right side node[i + 1] will become current_node
+                current_node = {}
+                if "RegistryObject" in nodes[i + 1].labels:
+                    record_id = nodes[i + 1].get("ro_id")
+                    current_node["ro_id"] = record_id
+                if "Identifier" in nodes[i + 1].labels:
+                    identifier_value = nodes[i + 1].get("identifier_value")
+                    identifier_type = nodes[i + 1].get("identifier_type")
+                    current_node[identifier_type] = identifier_value
+
+            # reached the end of the path
+            # add current node to the end of it was a true relationship path (not just sameAs)
+            if (i + 1) == len(relationships) and not justSameAs:
+                sPath += format(current_node)
+            if (i + 1) == len(relationships) and justSameAs:
+                sPath += ""
+        return sPath
+
+
+
+    def merge_and_build_tree_from_path(self, record):
+        relationships = record["path"].relationships
+        nodes = record["path"].nodes
+        sPath = ""
+
+        """
+        Identifier -> record always sameAs
+        Record -> Identifier can be anything
+        we only want RegistryObjects 
+        """
+        next_node = {}
+        #print(record["path"])
+        justSameAs = True
+        for i in (range(len(relationships))):
+            # iterate through all relationships and pick the nodes from left to right
+            record_id = None
+            identifier_value = None
+            identifier_type = None
+            if relationships[i].type == 'sameAs':
+                # if it's the 'sameAs' then both side added to current_node
+                if "RegistryObject" in nodes[i].labels:
+                    record_id = nodes[i].get("ro_id")
+                    self.add_node("ro_id", record_id)
+                if "Identifier" in nodes[i].labels:
+                    identifier_value = nodes[i].get("identifier_value")
+                    identifier_type = nodes[i].get("identifier_type")
+                    self.add_node(identifier_type, identifier_value)
+
+                if "RegistryObject" in nodes[i + 1].labels:
+                    record_id_s = nodes[i + 1].get("ro_id")
+                    if record_id is not None:
+                        self.update_node("ro_id", record_id, "ro_id", record_id_s)
+                    if identifier_value is not None:
+                        self.update_node(identifier_type, identifier_value, "ro_id", record_id_s)
+                if "Identifier" in nodes[i + 1].labels:
+                    identifier_value_s = nodes[i + 1].get("identifier_value")
+                    identifier_type_s = nodes[i + 1].get("identifier_type")
+                    if record_id is not None:
+                        self.update_node("ro_id", record_id, identifier_type_s, identifier_value_s)
+                    if identifier_value is not None:
+                        self.update_node(identifier_type, identifier_value, identifier_type_s, identifier_value_s)
+
+            else:
+                if "RegistryObject" in nodes[i].labels:
+                    record_id = nodes[i].get("ro_id")
+                    self.add_node("ro_id", record_id)
+                if "Identifier" in nodes[i].labels:
+                    identifier_value = nodes[i].get("identifier_value")
+                    identifier_type = nodes[i].get("identifier_type")
+                    self.add_node(identifier_type, identifier_value)
+
+                if nodes[i].id == relationships[i].start_node.id:
+                    relationships_type = relationships[i].type
+                else:
+                    relationships_type = self.get_reverse_relationship(relationships[i].type)
+                # right side node[i + 1] will become current_node
+                if "RegistryObject" in nodes[i + 1].labels:
+                    record_id_s = nodes[i + 1].get("ro_id")
+                    self.add_node("ro_id", record_id_s)
+                    if record_id is not None:
+                        self.add_or_update_child_node("ro_id", record_id, relationships_type, "ro_id", record_id_s)
+                    if identifier_value is not None:
+                        self.add_or_update_child_node(identifier_type, identifier_value, relationships_type, "ro_id", record_id_s)
+                if "Identifier" in nodes[i + 1].labels:
+                    identifier_value_s = nodes[i + 1].get("identifier_value")
+                    identifier_type_s = nodes[i + 1].get("identifier_type")
+                    self.add_node(identifier_type_s, identifier_value_s)
+                    if record_id is not None:
+                        self.add_or_update_child_node("ro_id", record_id, relationships_type, identifier_type_s, identifier_value_s)
+                    if identifier_value is not None:
+                        self.add_or_update_child_node(identifier_type, identifier_value, relationships_type, identifier_type_s, identifier_value_s)
+
+
+
+    def add_or_update_child_node(self, identifier_type, identifier_value, relationship_type, child_identifier_type, child_identifier_value):
+        self.node_list.addRelatedNode(identifier_type, identifier_value, relationship_type, child_identifier_type, child_identifier_value)
+
+    def update_node(self, identifier_type, identifier_value, some_other_identifier_type, some_other_identifier_value):
+        self.node_list.updateNode(identifier_type, identifier_value, some_other_identifier_type, some_other_identifier_value)
+
+    def add_node(self, identifier_type, identifier_value):
+        self.node_list.addNode(identifier_type, identifier_value)
 
     def getGrantGraph(self, identifier_value, identifier_type):
         with self.driver.session() as session:
@@ -233,9 +466,10 @@ class RelationshipProvider:
         path_def = "sameAs|isPartOf>|<hasPart"
         query = (
             "MATCH(p:Identifier {identifier_value: $identifier_value, identifier_type: $identifier_type}) "
-            "CALL apoc.path.expandConfig(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 10}) "
+            "CALL apoc.path.expandConfig(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 3}) "
             "YIELD path "
-            "RETURN path"
+            "RETURN path "
+            "ORDER BY length(path) DESC;"
         )
         result = tx.run(query,  identifier_value=identifier_value, identifier_type=identifier_type,  path_def=path_def)
         try:
@@ -249,6 +483,7 @@ class RelationshipProvider:
 
     @staticmethod
     def _get_nested_collections(tx, identifier_value, identifier_type):
+
         path_def = "sameAs|<isPartOf|hasPart>"
         query = (
             "MATCH(p:Identifier {identifier_value: $identifier_value, identifier_type: $identifier_type}) "
@@ -309,7 +544,7 @@ class RelationshipProvider:
         path_def = "sameAs|isFunderOf|isFundedBy|isPartOf|hasPart|isOutputOf|hasOutput|isProducedBy"
         query = (
             "MATCH(p:Identifier {identifier_value: $identifier_value, identifier_type: $identifier_type}) "
-            "CALL apoc.path.expandConfig(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 5}) "
+            "CALL apoc.path.subgraphAll(p, {relationshipFilter: $path_def, minLevel: 1, maxLevel: 5}) "
             "YIELD path "
             "RETURN path"
         )

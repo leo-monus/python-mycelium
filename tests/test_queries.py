@@ -40,6 +40,18 @@ class test_queries(unittest.TestCase):
         result = r.get_nested_collections("http://vivo.curtin.edu.au/vivo/individual/tm66442326", "ro_key")
         print(result)
 
+    def test_get_collectiomn_tree(self):
+        r = RelationshipProvider()
+        result = r.get_nested_collections_subtree("102.100.100/10125", "ro_key")
+        print(result)
+
+    def test_build_collectiomn_tree(self):
+        r = RelationshipProvider()
+        result = r.get_nested_collections_tree("102.100.100/10125", "ro_key")
+        for n in result.nodeList:
+            result.nodeList[n].print()
+
+
 
 
     def test_get_path_between_two_identifiers(self):

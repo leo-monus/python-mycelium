@@ -30,6 +30,22 @@ def new(daemon):
             print(e)
             return
 
+    @app.route('/get_collection_tree', methods=['GET'])
+    def getNestedCollectiomn_tree():
+        try:
+            identifier_value = request.args.get('identifier_value', type=str)
+            identifier_type = request.args.get('identifier_type', type=str)
+            if identifier_value is None or identifier_value == "" :
+                return "identifier_value is required"
+            elif identifier_type is None or identifier_type == "":
+                return "identifier_type is required"
+            else:
+                return daemon.get_nested_collections_subtree(identifier_value, identifier_type)
+        except Exception as e:
+            print(e)
+            return
+
+
     @app.route('/get_implicit_relationship_between', methods=['GET'])
     def getImplicitRelationships():
         try:
